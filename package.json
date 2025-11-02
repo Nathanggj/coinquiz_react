@@ -10,10 +10,13 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "axios": "^1.13.1",
     "expo": "~54.0.20",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-calendars": "^1.1313.0",
+    "react-native-safe-area-context": "^5.6.2"
   },
   "private": true
 }
