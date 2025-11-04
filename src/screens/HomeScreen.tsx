@@ -3,24 +3,29 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
     TouchableOpacity,
     RefreshControl,
     ActivityIndicator,
     Alert,
+    ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar, DateData } from 'react-native-calendars';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
-import { MainTabParamList } from '../navigation/MainNavigator';
+import { CompositeScreenProps } from '@react-navigation/native';
+import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { MainTabParamList, RootStackParamList } from '../navigation/MainNavigator';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
+type Props = CompositeScreenProps<
+    BottomTabScreenProps<MainTabParamList, 'Home'>,
+    NativeStackScreenProps<RootStackParamList>
+>;
 
 interface Shift {
     id: string;
@@ -47,6 +52,7 @@ export default function HomeScreen({ navigation }: Props) {
 
     const theme = useTheme();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
         loadHouseholds();
@@ -136,55 +142,6 @@ export default function HomeScreen({ navigation }: Props) {
         }
     }
 
-    const renderShiftItem = ({ item }: { item: Shift }) => {
-        const isMyShift = item.assignedUser.id === user?.id;
-        const canComplete = isMyShift && item.status === 'PENDING';
-
-        return (
-            <View
-                style={[styles.shiftCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}
-            >
-                <View style={styles.shiftHeader}>
-                    <View
-                        style={[
-                            styles.iconBadge,
-                            { backgroundColor: item.taskType.color || theme.colors.primary + '20' },
-                        ]}
-                    >
-                        <Ionicons
-                            name={(item.taskType.icon as any) || 'checkbox-outline'}
-                            size={24}
-                            color={item.taskType.color || theme.colors.primary}
-                        />
-                    </View>
-                    <View style={styles.shiftInfo}>
-                        <Text style={[styles.shiftTitle, { color: theme.colors.text }]}>
-                            {item.taskType.name}
-                        </Text>
-                        <Text style={[styles.shiftAssigned, { color: theme.colors.textSecondary }]}>
-                            {isMyShift ? 'Il tuo turno' : `Assegnato a ${item.assignedUser.name}`}
-                        </Text>
-                    </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                        <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                            {getStatusText(item.status)}
-                        </Text>
-                    </View>
-                </View>
-
-                {canComplete && (
-                    <TouchableOpacity
-                        style={[styles.completeButton, { backgroundColor: theme.colors.success }]}
-                        onPress={() => handleCompleteShift(item.id)}
-                    >
-                        <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                        <Text style={styles.completeButtonText}>Completa</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-        );
-    };
-
     if (loading) {
         return (
             <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
@@ -217,116 +174,163 @@ export default function HomeScreen({ navigation }: Props) {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <View>
-                    <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>
-                        Ciao, {user?.name}!
-                    </Text>
-                    <Text style={[styles.householdName, { color: theme.colors.text }]}>
-                        {selectedHousehold.name}
-                    </Text>
-                </View>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={[styles.headerButton, theme.shadows.sm]}
-                        onPress={() => navigation.navigate('TasksList', { householdId: selectedHousehold.id })}
-                    >
-                        <Ionicons name="list" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.headerButton, theme.shadows.sm]}
-                        onPress={() => navigation.navigate('Settings')}
-                    >
-                        <Ionicons name="settings" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Quick Stats */}
-            <View style={styles.quickStats}>
-                <View style={[styles.statCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}>
-                    <Ionicons name="checkmark-circle" size={28} color={theme.colors.success} />
-                    <Text style={[styles.statValue, { color: theme.colors.text }]}>
-                        {shifts.filter(s => s.status === 'COMPLETED' && s.scheduledDate === selectedDate).length}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-                        Completati oggi
-                    </Text>
-                </View>
-                <View style={[styles.statCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}>
-                    <Ionicons name="time" size={28} color={theme.colors.warning} />
-                    <Text style={[styles.statValue, { color: theme.colors.text }]}>
-                        {shifts.filter(s => s.status === 'PENDING' && s.assignedUser.id === user?.id).length}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
-                        I miei turni
-                    </Text>
-                </View>
-            </View>
-
-            {/* Calendar */}
-            <View style={[styles.calendarContainer, { backgroundColor: theme.colors.surface }, theme.shadows.md]}>
-                <Calendar
-                    current={selectedDate}
-                    onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
-                    markedDates={{
-                        [selectedDate]: {
-                            selected: true,
-                            selectedColor: theme.colors.primary,
-                        },
-                        // Aggiungi marker per date con turni
-                        ...shifts.reduce((acc, shift) => {
-                            if (shift.scheduledDate !== selectedDate) {
-                                acc[shift.scheduledDate] = {
-                                    marked: true,
-                                    dotColor: theme.colors.primary,
-                                };
-                            }
-                            return acc;
-                        }, {} as any),
-                    }}
-                    theme={{
-                        backgroundColor: theme.colors.surface,
-                        calendarBackground: theme.colors.surface,
-                        textSectionTitleColor: theme.colors.textSecondary,
-                        selectedDayBackgroundColor: theme.colors.primary,
-                        selectedDayTextColor: '#FFFFFF',
-                        todayTextColor: theme.colors.primary,
-                        dayTextColor: theme.colors.text,
-                        textDisabledColor: theme.colors.textSecondary,
-                        monthTextColor: theme.colors.text,
-                        textMonthFontWeight: '600',
-                        textMonthFontSize: 18,
-                    }}
-                />
-            </View>
-
-            {/* Shifts List */}
-            <View style={styles.shiftsSection}>
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-                        Turni del {format(new Date(selectedDate), 'd MMMM', { locale: it })}
-                    </Text>
-                    <TouchableOpacity onPress={onRefresh}>
-                        <Ionicons name="refresh" size={24} color={theme.colors.primary} />
-                    </TouchableOpacity>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.colors.primary}
+                    />
+                }
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <View>
+                        <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>
+                            Ciao, {user?.name}!
+                        </Text>
+                        <Text style={[styles.householdName, { color: theme.colors.text }]}>
+                            {selectedHousehold.name}
+                        </Text>
+                    </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            style={[styles.headerButton, theme.shadows.sm]}
+                            onPress={() => navigation.navigate('TasksList', { householdId: selectedHousehold.id })}
+                        >
+                            <Ionicons name="list" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.headerButton, theme.shadows.sm]}
+                            onPress={() => navigation.navigate('Settings')}
+                        >
+                            <Ionicons name="settings" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <FlatList
-                    data={getShiftsForSelectedDate()}
-                    renderItem={renderShiftItem}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.shiftsList}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={theme.colors.primary}
-                        />
-                    }
-                    ListEmptyComponent={
+                {/* Quick Stats */}
+                <View style={styles.quickStats}>
+                    <View style={[styles.statCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}>
+                        <Ionicons name="checkmark-circle" size={28} color={theme.colors.success} />
+                        <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                            {shifts.filter(s => s.status === 'COMPLETED' && s.scheduledDate === selectedDate).length}
+                        </Text>
+                        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                            Completati oggi
+                        </Text>
+                    </View>
+                    <View style={[styles.statCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}>
+                        <Ionicons name="time" size={28} color={theme.colors.warning} />
+                        <Text style={[styles.statValue, { color: theme.colors.text }]}>
+                            {shifts.filter(s => s.status === 'PENDING' && s.assignedUser.id === user?.id).length}
+                        </Text>
+                        <Text style={[styles.statLabel, { color: theme.colors.textSecondary }]}>
+                            I miei turni
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Calendar */}
+                <View style={[styles.calendarContainer, { backgroundColor: theme.colors.surface }, theme.shadows.md]}>
+                    <Calendar
+                        current={selectedDate}
+                        onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
+                        markedDates={{
+                            [selectedDate]: {
+                                selected: true,
+                                selectedColor: theme.colors.primary,
+                            },
+                            ...shifts.reduce((acc, shift) => {
+                                if (shift.scheduledDate !== selectedDate) {
+                                    acc[shift.scheduledDate] = {
+                                        marked: true,
+                                        dotColor: theme.colors.primary,
+                                    };
+                                }
+                                return acc;
+                            }, {} as any),
+                        }}
+                        theme={{
+                            backgroundColor: theme.colors.surface,
+                            calendarBackground: theme.colors.surface,
+                            textSectionTitleColor: theme.colors.textSecondary,
+                            selectedDayBackgroundColor: theme.colors.primary,
+                            selectedDayTextColor: '#FFFFFF',
+                            todayTextColor: theme.colors.primary,
+                            dayTextColor: theme.colors.text,
+                            textDisabledColor: theme.colors.textSecondary,
+                            monthTextColor: theme.colors.text,
+                            textMonthFontWeight: '600',
+                            textMonthFontSize: 18,
+                        }}
+                    />
+                </View>
+
+                {/* Shifts Section */}
+                <View style={styles.shiftsSection}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+                            Turni del {format(new Date(selectedDate), 'd MMMM', { locale: it })}
+                        </Text>
+                        <TouchableOpacity onPress={onRefresh}>
+                            <Ionicons name="refresh" size={24} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Shifts List */}
+                    {getShiftsForSelectedDate().length > 0 ? (
+                        getShiftsForSelectedDate().map((item) => {
+                            const isMyShift = item.assignedUser.id === user?.id;
+                            const canComplete = isMyShift && item.status === 'PENDING';
+
+                            return (
+                                <View
+                                    key={item.id}
+                                    style={[styles.shiftCard, { backgroundColor: theme.colors.surface }, theme.shadows.sm]}
+                                >
+                                    <View style={styles.shiftHeader}>
+                                        <View
+                                            style={[
+                                                styles.iconBadge,
+                                                { backgroundColor: item.taskType.color || theme.colors.primary + '20' },
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                name={(item.taskType.icon as any) || 'checkbox-outline'}
+                                                size={24}
+                                                color={item.taskType.color || theme.colors.primary}
+                                            />
+                                        </View>
+                                        <View style={styles.shiftInfo}>
+                                            <Text style={[styles.shiftTitle, { color: theme.colors.text }]}>
+                                                {item.taskType.name}
+                                            </Text>
+                                            <Text style={[styles.shiftAssigned, { color: theme.colors.textSecondary }]}>
+                                                {isMyShift ? 'Il tuo turno' : `Assegnato a ${item.assignedUser.name}`}
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                                            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                                                {getStatusText(item.status)}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {canComplete && (
+                                        <TouchableOpacity
+                                            style={[styles.completeButton, { backgroundColor: theme.colors.success }]}
+                                            onPress={() => handleCompleteShift(item.id)}
+                                        >
+                                            <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                                            <Text style={styles.completeButtonText}>Completa</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            );
+                        })
+                    ) : (
                         <View style={styles.emptyShifts}>
                             <Ionicons name="calendar-outline" size={64} color={theme.colors.textSecondary} />
                             <Text style={[styles.emptyShiftsText, { color: theme.colors.textSecondary }]}>
@@ -341,9 +345,12 @@ export default function HomeScreen({ navigation }: Props) {
                                 </Text>
                             </TouchableOpacity>
                         </View>
-                    }
-                />
-            </View>
+                    )}
+                </View>
+
+                {/* Padding inferiore per il tab bar */}
+                <View style={{ height: Math.max(insets.bottom, 20) + 80 }} />
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -412,8 +419,8 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     shiftsSection: {
-        flex: 1,
         paddingHorizontal: 16,
+        paddingBottom: 16,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -424,9 +431,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '600',
-    },
-    shiftsList: {
-        paddingBottom: 100,
     },
     shiftCard: {
         borderRadius: 12,

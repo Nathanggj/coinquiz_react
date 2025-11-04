@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import HomeScreen from '../screens/HomeScreen';
@@ -15,6 +16,10 @@ export type MainTabParamList = {
     Shifts: undefined;
     Stats: undefined;
     Settings: undefined;
+};
+
+export type RootStackParamList = {
+    MainTabs: undefined;
     TasksList: { householdId: string };
     CreateTaskType: { householdId: string };
     SetupRotation: {
@@ -25,12 +30,14 @@ export type MainTabParamList = {
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export default function MainNavigator() {
+function TabNavigator() {
     const theme = useTheme();
 
     return (
         <Tab.Navigator
+            id={undefined}
             screenOptions={({ route }) => ({
                 headerShown: false,
                 tabBarIcon: ({ focused, color, size }) => {
@@ -54,8 +61,6 @@ export default function MainNavigator() {
                     backgroundColor: theme.colors.surface,
                     borderTopWidth: 1,
                     borderTopColor: theme.colors.border,
-                    paddingBottom: 8,
-                    paddingTop: 8,
                     height: 60,
                 },
                 tabBarLabelStyle: {
@@ -64,7 +69,6 @@ export default function MainNavigator() {
                 },
             })}
         >
-            {/* Main Tabs - Visibili nella tab bar */}
             <Tab.Screen
                 name="Home"
                 component={HomeScreen}
@@ -85,32 +89,20 @@ export default function MainNavigator() {
                 component={SettingsScreen}
                 options={{ title: 'Impostazioni' }}
             />
-
-            {/* Hidden Screens - Non visibili nella tab bar */}
-            <Tab.Screen
-                name="TasksList"
-                component={TasksListScreen}
-                options={{
-                    tabBarButton: () => null, // Nasconde dalla tab bar
-                    tabBarStyle: { display: 'none' }, // Nasconde la tab bar quando questa schermata è attiva
-                }}
-            />
-            <Tab.Screen
-                name="CreateTaskType"
-                component={CreateTaskTypeScreen}
-                options={{
-                    tabBarButton: () => null,
-                    tabBarStyle: { display: 'none' },
-                }}
-            />
-            <Tab.Screen
-                name="SetupRotation"
-                component={SetupRotationScreen}
-                options={{
-                    tabBarButton: () => null,
-                    tabBarStyle: { display: 'none' },
-                }}
-            />
         </Tab.Navigator>
+    );
+}
+
+export default function MainNavigator() {
+    return (
+        <Stack.Navigator
+            id={undefined}
+            screenOptions={{ headerShown: false }}
+        >
+            <Stack.Screen name="MainTabs" component={TabNavigator} />
+            <Stack.Screen name="TasksList" component={TasksListScreen} />
+            <Stack.Screen name="CreateTaskType" component={CreateTaskTypeScreen} />
+            <Stack.Screen name="SetupRotation" component={SetupRotationScreen} />
+        </Stack.Navigator>
     );
 }
